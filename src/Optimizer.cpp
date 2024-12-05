@@ -1,38 +1,79 @@
 #include "Optimizer.h"
 
+bool Optimizer::convoluteBasicBinOpSituations(BinaryOperation& b) {
+    INode* optimizedLhs = optimizeNode(b.getLhs());
+    INode* optimizedRhs = optimizeNode(b.getRhs());
+
+    if (b.getBinOp() == AND || b.getBinOp() == OR) {
+        if (optimizedLhs->getHash() == optimizedRhs->getHash()) {
+            optimizedTree = optimizedLhs;
+            return true;
+        }
+    }
+
+    Integer* castedLhs = dynamic_cast<Integer*>(optimizedLhs);
+    Integer* castedRhs = dynamic_cast<Integer*>(optimizedRhs);
+
+    if (castedLhs && castedLhs->getValue() == 0) {
+        if (b.getBinOp() == AND) {
+            optimizedTree = castedLhs;
+            return true;
+        } else if (b.getBinOp() == OR) {
+            optimizedTree = optimizedRhs;
+            return true;
+        }
+    }
+
+    if (castedRhs && castedRhs->getValue() == 0) {
+        if (b.getBinOp() == AND) {
+            optimizedTree = castedRhs;
+            return true;
+        } else if (b.getBinOp() == OR) {
+            optimizedTree = optimizedLhs;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool Optimizer::convoluteBinaryOP(BinaryOperation& b) {
     INode* optimizedLhs = optimizeNode(b.getLhs());
     INode* optimizedRhs = optimizeNode(b.getRhs());
-        
-    //( ( a & b ) | ( a & !b ) ) = a
-        
-    if (b.getBinOp() == OR) {
-        if (BinaryOperation* andOp1 = dynamic_cast<BinaryOperation*>(optimizedLhs); andOp1->getBinOp() == AND) {
-            if (BinaryOperation* andOp2 = dynamic_cast<BinaryOperation*>(optimizedRhs); andOp2->getBinOp() == AND) {
-                 if (dynamic_cast<UnaryOperation*>(andOp2->getRhs())){
-                    optimizedTree = andOp1->getLhs();
-                    return true;
-                }
-            }
-        }
-    } 
-        
-    //( ( a | b ) & ( a | !b ) ) = a
-        
-    if (b.getBinOp() == AND) {
-        if (BinaryOperation* andOp1 = dynamic_cast<BinaryOperation*>(optimizedLhs); andOp1 && andOp1->getBinOp() == OR) {
-            if (BinaryOperation* andOp2 = dynamic_cast<BinaryOperation*>(optimizedRhs); andOp2 && andOp2->getBinOp() == OR) {
-                if (dynamic_cast<UnaryOperation*>(andOp2->getRhs())) {
-                    optimizedTree = andOp1->getLhs();
-                    return true;
-                }
-            }
-        }
-    } 
-        
-    return false;
+
+    if (b.getBinOp() != OR && b.getBinOp() != AND) {
+        return false;
+    }
+
+    BinaryOperation* andOp1 = dynamic_cast<BinaryOperation*>(optimizedLhs);
+    BinaryOperation* andOp2 = dynamic_cast<BinaryOperation*>(optimizedRhs);
+
+    if (!andOp1 || !andOp2) {
+        return false;
+    }
+
+    if ((b.getBinOp() == OR && (andOp1->getBinOp() != AND || andOp2->getBinOp() != AND)) ||
+        (b.getBinOp() == AND && (andOp1->getBinOp() != OR || andOp2->getBinOp() != OR))) {
+        return false;
+    }
+
+    UnaryOperation* unOp = dynamic_cast<UnaryOperation*>(andOp2->getRhs());
+
+    if (!unOp) {
+        return false;
+    }
+
+    bool leftHashesEq = andOp1->getLhs()->getHash() == andOp2->getLhs()->getHash();
+    bool rightHashesEq = andOp1->getRhs()->getHash() == unOp->getOperand()->getHash();
+
+    if (!leftHashesEq || !rightHashesEq) {
+        return false;
+    }
+
+    optimizedTree = andOp1->getLhs();
+    return true;
 }
-    
+
 void Optimizer::visitBinaryOp(BinaryOperation& b) {
     INode* optimizedLhs = optimizeNode(b.getLhs());
     INode* optimizedRhs = optimizeNode(b.getRhs());
@@ -54,12 +95,20 @@ void Optimizer::visitBinaryOp(BinaryOperation& b) {
             return;
         }
     }
-        
-    if (convoluteBinaryOP(b)) {
-        return;
+
+    bool expressionOptimized = false;
+
+    if (!expressionOptimized) {
+        expressionOptimized = convoluteBinaryOP(b);
     }
-        
-    optimizedTree = new BinaryOperation(optimizedLhs, optimizedRhs, b.getBinOp());
+
+    if (!expressionOptimized) {
+        expressionOptimized = convoluteBasicBinOpSituations(b);
+    }
+
+    if (!expressionOptimized) {
+        optimizedTree = new BinaryOperation(optimizedLhs, optimizedRhs, b.getBinOp());
+    }
 }
 
 void Optimizer::visitUnaryOp(UnaryOperation& u) {

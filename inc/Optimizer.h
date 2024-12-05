@@ -24,6 +24,7 @@ private:
     }
 
     bool convoluteBinaryOP(BinaryOperation& b);
+    bool convoluteBasicBinOpSituations(BinaryOperation& b);
     
     void visitBinaryOp(BinaryOperation& b) override;
     void visitUnaryOp(UnaryOperation& u) override;

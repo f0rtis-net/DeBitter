@@ -8,7 +8,6 @@ void MiniLexer::setTextToProcess(const std::string& text) {
     next();
 }
 
-
 void MiniLexer::next() {
     currSymbol = getChar();
 
@@ -46,7 +45,7 @@ void MiniLexer::next() {
         return;
     }
 
-    if (currSymbol == EOF) {
+    if (currSymbol == EOF || index == (textLength - 1)) {
         currType = TokenType::_EOF;
         return;
     }

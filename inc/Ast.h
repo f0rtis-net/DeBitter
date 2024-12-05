@@ -15,6 +15,7 @@ enum UnaryOperators {
 class INode {
 public:
     virtual void accept(IVisitor* v) = 0;
+    virtual int getHash() = 0;
     virtual ~INode() {}
 };
 
@@ -26,6 +27,9 @@ public:
     void accept(IVisitor* v) override {
         v->visitInteger(*this);
     }
+
+    int getHash() override { return value; }
+
     int getValue() const { return value; }
 };
 
@@ -37,6 +41,8 @@ public:
     void accept(IVisitor* v) override {
         v->visitIdentifier(*this);
     }
+
+    int getHash() override { return (int)name; }
     
     char getName() {return name;}
 };
@@ -45,6 +51,7 @@ class BinaryOperation : public INode {
     BinaryOperators op;
     INode* lhs;
     INode* rhs;
+    int hash = -1;
 public:
     BinaryOperation(INode* lhs, INode* rhs, BinaryOperators op)
         : lhs(lhs), rhs(rhs), op(op) {}
@@ -52,6 +59,17 @@ public:
     void accept(IVisitor* v) override {
         v->visitBinaryOp(*this);
     }
+
+    int getHash() override { 
+        if (hash != -1)
+            return hash;
+
+        hash = (int)op;
+        hash = 31 * hash + lhs->getHash();
+        hash = 31 * hash + rhs->getHash();
+        return hash;
+    }
+
     INode* getLhs() const { return lhs; }
     INode* getRhs() const { return rhs; }
     BinaryOperators getBinOp() const { return op; }
@@ -60,6 +78,7 @@ public:
 class UnaryOperation : public INode {
     UnaryOperators op;
     INode* operand;
+    int hash = -1;
 public:
     UnaryOperation(INode* operand, UnaryOperators op)
         : operand(operand), op(op) {}
@@ -67,6 +86,16 @@ public:
     void accept(IVisitor* v) override {
         v->visitUnaryOp(*this);
     }
+
+    int getHash() override { 
+        if (hash != -1)
+            return hash;
+
+        hash = (int)op;
+        hash = 31 * hash + operand->getHash();
+        return hash;
+    }
+    
     INode* getOperand() const { return operand; }
     UnaryOperators getUnaryOp() const { return op; }
 };
